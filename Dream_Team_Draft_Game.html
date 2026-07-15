@@ -136,11 +136,34 @@
     .m2-adv .ab{font-size:13.5px;line-height:1.7;}
     .m2-adv .ab b{color:#1C7CD9;}
 
+    #d-handle{display:none;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:700;color:#1E5FD6;padding-bottom:8px;cursor:pointer;}
+    #d-handle .chev{font-size:14px;color:rgba(20,38,92,0.5);}
     @media (max-width:900px){
       #detail{width:250px;top:auto;bottom:16px;right:12px;padding:14px;}
       #detail .dh .demo{font-size:28px;}
       #detail li{font-size:11px;}
       .spk{grid-template-columns:1fr;}
+    }
+    /* ── Mobile layout (phones) ── */
+    @media (max-width:700px){
+      #hud{flex-wrap:wrap;gap:6px;padding:8px 92px 4px 10px;}
+      #hud .hp{font-size:10.5px;padding:6px 10px;}
+      .hm{order:3;flex-basis:100%;max-width:none;font-size:11px;padding:6px 12px;}
+      .hm .lbl{font-size:9px;}
+      #mystyle-chip{display:none;}
+      #dots{top:104px;}
+      #detail{position:fixed;top:auto;left:0;right:0;bottom:0;width:100%;max-height:46vh;overflow-y:auto;
+        border-radius:20px 20px 0 0;padding:12px 16px 20px;pointer-events:auto;z-index:55;
+        border:1px solid rgba(30,95,214,0.35);border-bottom:none;background:rgba(255,255,255,0.96);
+        box-shadow:0 -6px 24px rgba(20,60,140,0.18);
+        transform:translateY(calc(100% - 44px));transition:transform .28s ease;}
+      #detail.open{transform:translateY(0);}
+      #d-handle{display:flex;}
+      #detail .empty{padding:14px 8px;}
+      #detail .dh .demo{font-size:30px;}
+      #detail li{font-size:12px;}
+      #hand-tip{bottom:calc(46vh + 12px);font-size:11px;max-width:92%;white-space:normal;text-align:center;}
+      #cam-toast{top:110px;left:10px;right:10px;max-width:none;}
     }
   </style>
 </head>
@@ -174,6 +197,7 @@
   <div id="cam-toast"><span class="cls" id="toast-cls">✕</span><span id="cam-toast-msg"></span></div>
 
   <div id="detail">
+    <div id="d-handle"><span data-t="d_handle"></span><span class="chev">▲▼</span></div>
     <div class="empty" id="detail-empty" data-t="d_empty"></div>
     <div id="detail-body" style="display:none">
       <div class="dh"><div class="demo" id="dt-emo"></div><div><div class="dnm" id="dt-nm"></div><div class="dty" id="dt-ty"></div></div></div>
@@ -252,7 +276,8 @@ const UI={
   mission:{th:'ถ้าเลือกได้ คุณจะเอาใครเข้าทีม? เลือก 2 คน',en:'If you could choose — who joins your team? Pick 2.'},
   pick:{th:'เลือก',en:'Picked'},
   handtip:{th:'ชูมือให้กล้องเห็น แล้วจีบนิ้วชี้+โป้ง เพื่อหยิบการ์ด',en:'Show your hand to the camera, pinch index+thumb to grab a card'},
-  d_empty:{th:'👆 ชี้ที่การ์ด<br>เพื่ออ่านรายละเอียดของแต่ละคน',en:'👆 Point at a card<br>to read each person\'s full profile'},
+  d_empty:{th:'👆 แตะที่การ์ด<br>เพื่ออ่านรายละเอียดของแต่ละคน',en:'👆 Tap a card<br>to read each person\'s full profile'},
+  d_handle:{th:'📋 รายละเอียดการ์ด',en:'📋 Card details'},
   d_good:{th:'ข้อดี',en:'Strengths'},
   d_bad:{th:'ความเสี่ยง',en:'Risks'},
   r_title:{th:'ทีมในฝันของคุณ',en:'Your dream team'},
@@ -381,7 +406,7 @@ document.getElementById('lg-en').addEventListener('click',()=>{LANG='en';applyLa
 
 // ─────────── layout ───────────
 let CW=192, CH=152;
-const SLOT_GAP=16, SLOT_Y=108;
+const SLOT_GAP=16; let SLOT_Y=108;
 let SLOT_W=210, SLOT_H=152;
 const PINCH_DIST=55;
 const PANEL_W=360;
@@ -401,13 +426,18 @@ const pdotEl=document.getElementById('pdot');
 const camEl=document.getElementById('cam-txt');
 const pfbEl=document.getElementById('pfb');
 const detailEl=document.getElementById('detail');
+document.getElementById('d-handle').addEventListener('click',()=>detailEl.classList.toggle('open'));
 
 function sfx(id){const a=document.getElementById(id);if(a){a.currentTime=0;a.play().catch(()=>{});}}
 function playAreaCenter(){return canvas.width>900 ? (canvas.width-PANEL_W)/2 : canvas.width/2;}
 
 function resize(){
   canvas.width=gw.clientWidth; canvas.height=gw.clientHeight;
-  if(canvas.width<760){CW=160;CH=140;SLOT_W=176;SLOT_H=140;} else {CW=192;CH=152;SLOT_W=210;SLOT_H=152;}
+  if(canvas.width<700){
+    CW=Math.min(160,Math.floor((canvas.width-40)/2));CH=112;
+    SLOT_W=CW+8;SLOT_H=CH;SLOT_Y=148;
+  } else if(canvas.width<760){CW=160;CH=140;SLOT_W=176;SLOT_H=140;SLOT_Y=108;}
+  else {CW=192;CH=152;SLOT_W=210;SLOT_H=152;SLOT_Y=108;}
   layoutSlots(); layoutCards(false);
 }
 window.addEventListener('resize',resize);
@@ -421,12 +451,13 @@ function layoutSlots(){
 let cardOrder=null;
 function layoutCards(reshuffle=true){
   if(reshuffle||!cardOrder)cardOrder=[...PERSONAS].sort(()=>Math.random()-.5).map(p=>p.id);
+  const mob = canvas.width<700;
   const wide = canvas.width>1150;
-  const cols = wide?4:2, gapX=16, gapY=14;
+  const cols = wide?4:2, gapX=mob?12:16, gapY=mob?10:14;
   const totalW=cols*(CW+gapX)-gapX;
   const padX=playAreaCenter()-totalW/2;
   const rows=Math.ceil(4/cols);
-  const startY=canvas.height-(rows*(CH+gapY))-46;
+  const startY=canvas.height-(rows*(CH+gapY))-(mob?58:46);
   cards=cardOrder.map((id,i)=>({
     id,
     x:padX+(i%cols)*(CW+gapX),
@@ -451,25 +482,26 @@ function drawCard(v,x,y,w,h,state){
   ctx.lineWidth=2;
   rr(ctx,x,y,w,h,16);ctx.fill();ctx.stroke();
 
-  ctx.font='30px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText(v.emoji,x+w/2,y+30);
-  ctx.font='700 17px IBM Plex Sans Thai';
+  const cpt=h<130; // compact layout for phone-size cards
+  ctx.font=(cpt?'22px':'30px')+' Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(v.emoji,x+w/2,y+(cpt?22:30));
+  ctx.font='700 '+(cpt?'14px':'17px')+' IBM Plex Sans Thai';
   ctx.fillStyle=state==='placed'?'#fff':'#14265C';
-  ctx.fillText(v.name[LANG],x+w/2,y+60);
-  ctx.font='600 13px IBM Plex Sans Thai';
+  ctx.fillText(v.name[LANG],x+w/2,y+(cpt?46:60));
+  ctx.font='600 '+(cpt?'11px':'13px')+' IBM Plex Sans Thai';
   ctx.fillStyle=state==='placed'?'rgba(255,255,255,0.9)':'#1C7CD9';
-  ctx.fillText(v.type[LANG],x+w/2,y+80);
-  ctx.font='500 10px IBM Plex Sans Thai';
+  ctx.fillText(v.type[LANG],x+w/2,y+(cpt?63:80));
+  ctx.font='500 '+(cpt?'8.5px':'10px')+' IBM Plex Sans Thai';
   ctx.fillStyle=state==='placed'?'rgba(255,255,255,0.7)':'rgba(20,38,92,0.5)';
-  ctx.fillText(v.role[LANG],x+w/2,y+98);
+  ctx.fillText(v.role[LANG],x+w/2,y+(cpt?78:98));
   if(state==='hover'){
-    ctx.font='500 10px IBM Plex Sans Thai';
+    ctx.font='500 '+(cpt?'8.5px':'10px')+' IBM Plex Sans Thai';
     ctx.fillStyle='#E08A00';
-    ctx.fillText(T('hint_hover'),x+w/2,y+h-16);
+    ctx.fillText(T('hint_hover'),x+w/2,y+h-(cpt?11:16));
   } else if(state==='normal'){
-    ctx.font='500 10px IBM Plex Sans Thai';
+    ctx.font='500 '+(cpt?'8.5px':'10px')+' IBM Plex Sans Thai';
     ctx.fillStyle='rgba(20,38,92,0.35)';
-    ctx.fillText(T('hint_normal'),x+w/2,y+h-16);
+    ctx.fillText(T('hint_normal'),x+w/2,y+h-(cpt?11:16));
   }
   ctx.restore();
 }
@@ -524,12 +556,13 @@ function drawCursor(){
   ctx.restore();
 }
 
+const isMobile=()=>window.matchMedia('(max-width:700px)').matches;
 function setDetail(id){
   if(currentDetail===id)return;
   currentDetail=id;
   const emptyEl=document.getElementById('detail-empty');
   const bodyEl=document.getElementById('detail-body');
-  if(!id){emptyEl.style.display='block';bodyEl.style.display='none';detailEl.classList.remove('active');return;}
+  if(!id){emptyEl.style.display='block';bodyEl.style.display='none';detailEl.classList.remove('active');if(isMobile())detailEl.classList.remove('open');return;}
   const v=PERSONAS.find(x=>x.id===id);
   emptyEl.style.display='none';bodyEl.style.display='block';detailEl.classList.add('active');
   document.getElementById('dt-emo').textContent=v.emoji;
@@ -539,6 +572,7 @@ function setDetail(id){
   document.getElementById('dt-trait').textContent='💬 '+v.trait[LANG];
   document.getElementById('dt-good').innerHTML=v.good[LANG].map(t=>`<li class="g">${t}</li>`).join('');
   document.getElementById('dt-bad').innerHTML=v.bad[LANG].map(t=>`<li class="b">${t}</li>`).join('');
+  if(isMobile())detailEl.classList.add('open');
 }
 
 function detectHover(){
